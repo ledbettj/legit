@@ -29,21 +29,21 @@ fn main() {
 
     {
         let mut ap = ArgumentParser::new();
-        ap.set_description("Generate a custom git commit sha");
+       ap.set_description("Generate git commit sha with a custom prefix");
 
         ap.refer(&mut repo_path)
-            .add_argument("path-to-repo", Store, "Path to your git repo")
+            .add_argument("repository-path", Store, "Path to your git repository (required)")
             .required();
 
         ap.refer(&mut target)
-            .add_option(&["-p", "--prefix"], Store, "Desired commit prefix")
+            .add_option(&["-p", "--prefix"], Store, "Desired commit prefix (required)")
             .required();
 
         ap.refer(&mut thread_count)
-            .add_option(&["-t", "--threads"], Store, "Number of worker threads to use");
+            .add_option(&["-t", "--threads"], Store, "Number of worker threads to use (default 8)");
 
         ap.refer(&mut message)
-            .add_option(&["-m", "--message"], Store, "Commit message to use")
+            .add_option(&["-m", "--message"], Store, "Commit message to use (required)")
             .required();
 
         ap.parse_args_or_exit();
