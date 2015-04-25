@@ -1,14 +1,11 @@
 use std::sync::mpsc;
 use crypto::digest::Digest;
 use crypto::sha1;
-use rand;
-use rand::Rng;
 use time;
 
 pub struct Worker {
     id:      u32,
     digest:  sha1::Sha1,
-    rng:     rand::ThreadRng,
     tx:      mpsc::Sender<(u32, String, String)>,
     target:  String,
     tree:    String,
@@ -28,7 +25,6 @@ impl Worker {
         Worker {
             id:      id,
             digest:  sha1::Sha1::new(),
-            rng:     rand::thread_rng(),
             tx:      tx,
             target:  target,
             tree:    tree,
@@ -39,28 +35,32 @@ impl Worker {
     }
 
     pub fn work(&mut self) {
+        let now  = time::now();
+        let nowz = now.strftime("%s %z").ok().expect("failed to format time");
+        let tstamp = format!("{}", nowz);
 
+        let mut value  = 0u32;
         loop {
-            let value = self.rng.next_u32();
-            let (raw, blob) = self.generate_blob(value);
+            let (raw, blob) = self.generate_blob(value, &tstamp);
             let result = self.calculate(&blob);
 
             if result.starts_with(&self.target) {
-                self.tx.send((self.id, raw, result));
+                self.tx.send((self.id, raw, result))
+                    .ok()
+                    .expect("failed to tx result");
                 break;
             }
+
+            value += 1;
         }
     }
 
-    fn generate_blob(&mut self, value: u32) -> (String, String) {
-        let now    = time::now();
-        let tstamp = now.strftime("%s %z").ok().expect("failed to format time");
-
+    fn generate_blob(&mut self, value: u32, tstamp: &str) -> (String, String) {
         let raw = format!("tree {}\n\
                            parent {}\n\
                            author {} {}\n\
                            committer {} {}\n\n\
-                           {} ({:02}-{:08x})",
+                           {}\n{:02}-{:08x}",
                           self.tree,
                           self.parent,
                           self.author, tstamp,

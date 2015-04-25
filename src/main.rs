@@ -4,7 +4,6 @@ extern crate git2;
 extern crate rand;
 extern crate time;
 
-use std::env;
 use std::fs::File;
 use std::io::*;
 use std::path::Path;
@@ -13,7 +12,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use argparse::{ArgumentParser,Store};
-use git2::{Repository,Config};
+use git2::Repository;
 
 use worker::Worker;
 
