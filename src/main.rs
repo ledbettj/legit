@@ -18,30 +18,37 @@ use worker::Worker;
 
 mod worker;
 
-static DEFAULT_THREAD_COUNT : u32 = 8;
+struct Options {
+    threads: u32,
+    target:  String,
+    message: String,
+    repo:    String
+}
 
 fn main() {
-    let mut target       = "000000".to_string();
-    let mut thread_count = DEFAULT_THREAD_COUNT;
-    let mut message      = "default commit message".to_string();
-    let mut repo_path    = ".".to_string();
+    let mut opts = Options{
+        threads: 8,
+        target:  "000000".to_string(),
+        message: "default commit message".to_string(),
+        repo:    ".".to_string()
+    };
 
     {
         let mut ap = ArgumentParser::new();
-       ap.set_description("Generate git commit sha with a custom prefix");
+        ap.set_description("Generate git commit sha with a custom prefix");
 
-        ap.refer(&mut repo_path)
+        ap.refer(&mut opts.repo)
             .add_argument("repository-path", Store, "Path to your git repository (required)")
             .required();
 
-        ap.refer(&mut target)
+        ap.refer(&mut opts.target)
             .add_option(&["-p", "--prefix"], Store, "Desired commit prefix (required)")
             .required();
 
-        ap.refer(&mut thread_count)
+        ap.refer(&mut opts.threads)
             .add_option(&["-t", "--threads"], Store, "Number of worker threads to use (default 8)");
 
-        ap.refer(&mut message)
+        ap.refer(&mut opts.message)
             .add_option(&["-m", "--message"], Store, "Commit message to use (required)")
             .required();
 
@@ -50,17 +57,17 @@ fn main() {
 
     let (tx, rx) = channel();
     let start = time::get_time();
-    let mut repo = match Repository::open(&repo_path) {
+    let mut repo = match Repository::open(&opts.repo) {
         Ok(r) => r,
-        Err(e) => panic!("failed to open {}: {}", &repo_path, e)
+        Err(e) => panic!("failed to open {}: {}", &opts.repo, e)
     };
     let (tree, parent) = get_repo_info(&mut repo);
     let author         = get_author(&repo);
 
-    for i in 0..thread_count {
+    for i in 0..opts.threads {
         let thread_tx     = tx.clone();
-        let thread_target = target.clone();
-        let (t, p, a, m) = (tree.clone(), parent.clone(), author.clone(), message.clone());
+        let thread_target = opts.target.clone();
+        let (t, p, a, m) = (tree.clone(), parent.clone(), author.clone(), opts.message.clone());
 
         thread::spawn(move || {
             Worker::new(
@@ -79,7 +86,7 @@ fn main() {
              hash,
              duration.num_seconds());
 
-    apply_commit(&repo_path, &hash, &blob);
+    apply_commit(&opts.repo, &hash, &blob);
 
     println!("All done! Enjoy your new commit.");
 }
