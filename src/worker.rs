@@ -13,6 +13,7 @@ pub struct Worker {
     target:  String,
     tree:    String,
     parent:  String,
+    author:  String,
     message: String
 }
 
@@ -21,6 +22,7 @@ impl Worker {
                target:  String,
                tree:    String,
                parent:  String,
+               author:  String,
                message: String,
                tx:      mpsc::Sender<(u32, String, String)>) -> Worker {
         Worker {
@@ -31,6 +33,7 @@ impl Worker {
             target:  target,
             tree:    tree,
             parent:  parent,
+            author:  author,
             message: message
         }
     }
@@ -58,10 +61,8 @@ impl Worker {
                            {} ({:02}-{:08x})",
                           self.tree,
                           self.parent,
-                          "John Ledbetter <john@throttle.io>",
-                          tstamp,
-                          "John Ledbetter <john@throttle.io>",
-                          tstamp,
+                          self.author, tstamp,
+                          self.author, tstamp,
                           self.message,
                           self.id,
                           value);
