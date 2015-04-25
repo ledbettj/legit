@@ -12,6 +12,7 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 
+use argparse::{ArgumentParser,Store};
 use git2::{Repository,Config};
 
 use worker::Worker;
@@ -21,23 +22,41 @@ mod worker;
 static DEFAULT_THREAD_COUNT : u32 = 8;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut target       = "000000".to_string();
+    let mut thread_count = DEFAULT_THREAD_COUNT;
+    let mut message      = "default commit message".to_string();
+    let mut repo_path    = ".".to_string();
 
-    if args.len() < 2 {
-        panic!("usage: {} <path-to-repo> [target]\n", args[0]);
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Generate a custom git commit sha");
+
+        ap.refer(&mut repo_path)
+            .add_argument("path-to-repo", Store, "Path to your git repo")
+            .required();
+
+        ap.refer(&mut target)
+            .add_option(&["-p", "--prefix"], Store, "Desired commit prefix")
+            .required();
+
+        ap.refer(&mut thread_count)
+            .add_option(&["-t", "--threads"], Store, "Number of worker threads to use");
+
+        ap.refer(&mut message)
+            .add_option(&["-m", "--message"], Store, "Commit message to use")
+            .required();
+
+        ap.parse_args_or_exit();
     }
 
-    let thread_count = DEFAULT_THREAD_COUNT;
-    let target = if args.len() > 2 { args[2].clone() } else { "00000".to_string() };
     let (tx, rx) = channel();
     let start = time::get_time();
-    let mut repo = match Repository::open(&args[1]) {
+    let mut repo = match Repository::open(&repo_path) {
         Ok(r) => r,
-        Err(e) => panic!("failed to open {}: {}", &args[1], e)
+        Err(e) => panic!("failed to open {}: {}", &repo_path, e)
     };
     let (tree, parent) = get_repo_info(&mut repo);
     let author         = get_author(&repo);
-    let message        = "commit message".to_string();
 
     for i in 0..thread_count {
         let thread_tx     = tx.clone();
@@ -61,7 +80,7 @@ fn main() {
              hash,
              duration.num_seconds());
 
-    apply_commit(&args[1], &hash, &blob);
+    apply_commit(&repo_path, &hash, &blob);
 
     println!("All done! Enjoy your new commit.");
 }
