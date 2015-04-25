@@ -78,7 +78,7 @@ fn main() {
         });
     };
 
-    let (id, blob, hash) = rx.recv().ok().expect("Recv failed");
+    let (id, blob, hash) = rx.recv().unwrap();
     let duration = time::get_time() - start;
 
     println!("success! worker {:02} generated commit {} in {}s",
@@ -92,24 +92,30 @@ fn main() {
 }
 
 fn apply_commit(git_root: &str, hash: &str, blob: &str) {
+    /* repo.blob() generates a blob, not a commit.
+     * don't know if there's a way to do this with libgit2. */
     let tmpfile  = format!("/tmp/{}.tmp", hash);
-    let mut file = File::create(&Path::new(&tmpfile)).ok().expect("File create failed");
+    let mut file = File::create(&Path::new(&tmpfile))
+        .ok()
+        .expect(&format!("Failed to create temporary file {}", &tmpfile));
 
-    file.write_all(blob.as_bytes()).ok().expect("File write failed");
+    file.write_all(blob.as_bytes())
+        .ok()
+        .expect(&format!("Failed to write temporary file {}", &tmpfile));
 
     Command::new("sh")
         .arg("-c")
-        .arg(format!("cd {} && git hash-object -t commit -w --stdin < {} && git reset --hard {}",
-                     git_root, tmpfile, hash))
-        .output().ok().expect("Failed to generate commit");
+        .arg(format!("cd {} && git hash-object -t commit -w --stdin < {} && git reset --hard {}", git_root, tmpfile, hash))
+        .output()
+        .ok()
+        .expect("Failed to generate commit");
 }
 
 
 fn get_repo_info(repo: &mut Repository) -> (String, String) {
-    let head = repo.revparse_single("HEAD").ok().expect("can't parse HEAD");
-    let mut index = repo.index().ok().expect("can't get index");
-    let tree = index.write_tree().ok().expect("can't write tree");
-
+    let head = repo.revparse_single("HEAD").unwrap();
+    let mut index = repo.index().unwrap();
+    let tree = index.write_tree().unwrap();
 
     let head_s = format!("{}", head.id());
     let tree_s = format!("{}", tree);
@@ -119,12 +125,14 @@ fn get_repo_info(repo: &mut Repository) -> (String, String) {
 
 fn get_author(repo: &Repository) -> String {
     let cfg = match repo.config() {
-        Ok(c) => c,
+        Ok(c)  => c,
         Err(e) => panic!("Couldn't open git config: {}", e)
     };
 
-    let name  = cfg.get_string("user.name").ok().expect("can't get git name");
-    let email = cfg.get_string("user.email").ok().expect("can't get git email");
+    let name  = cfg.get_string("user.name").ok()
+        .expect("Failed to read git config user.name");
+    let email = cfg.get_string("user.email").ok()
+        .expect("Failed to read git config user.email");
 
     format!("{} <{}>", name, email)
 }

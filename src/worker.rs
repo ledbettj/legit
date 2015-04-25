@@ -36,7 +36,7 @@ impl Worker {
 
     pub fn work(&mut self) {
         let now  = time::now();
-        let nowz = now.strftime("%s %z").ok().expect("failed to format time");
+        let nowz = now.strftime("%s %z").unwrap();
         let tstamp = format!("{}", nowz);
 
         let mut value  = 0u32;
@@ -45,9 +45,7 @@ impl Worker {
             let result = self.calculate(&blob);
 
             if result.starts_with(&self.target) {
-                self.tx.send((self.id, raw, result))
-                    .ok()
-                    .expect("failed to tx result");
+                self.tx.send((self.id, raw, result)).unwrap();
                 break;
             }
 
