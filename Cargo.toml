@@ -1,0 +1,11 @@
+[package]
+name    = "legit"
+version = "0.1.0"
+authors = ["John <john@throttle.io>"]
+
+[dependencies]
+rust-crypto = "*"
+rand        = "*"
+time        = "*"
+git2        = "*"
+argparse    = "*"
