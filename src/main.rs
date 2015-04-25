@@ -63,7 +63,7 @@ fn main() {
 
     apply_commit(&args[1], &hash, &blob);
 
-    println!("All done! Enjoy your new commit.")
+    println!("All done! Enjoy your new commit.");
 }
 
 fn apply_commit(git_root: &str, hash: &str, blob: &str) {

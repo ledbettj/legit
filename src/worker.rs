@@ -53,11 +53,13 @@ impl Worker {
     }
 
     fn generate_blob(&mut self, value: u32) -> (String, String) {
-        let tstamp = time::now_utc().to_timespec().sec;
+        let now    = time::now();
+        let tstamp = now.strftime("%s %z").ok().expect("failed to format time");
+
         let raw = format!("tree {}\n\
                            parent {}\n\
-                           author {} {} +0000\n\
-                           committer {} {} +0000\n\n\
+                           author {} {}\n\
+                           committer {} {}\n\n\
                            {} ({:02}-{:08x})",
                           self.tree,
                           self.parent,
