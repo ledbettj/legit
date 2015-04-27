@@ -6,10 +6,19 @@ As an example, take a look at a few of the commits in this repo.
 
 ### Usage
 
-```
+```shell
 cd ~/Projects/my-repo
 git add README.md
 legit ./ -m "Add a README" -p "000000"
+```
+
+### Compiling
+
+```shell
+brew tap nerdrew/tap
+brew install rust-nightly
+cd cloned_directory
+cargo build
 ```
 
 ### Warning
