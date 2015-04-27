@@ -12,7 +12,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 
 use argparse::{ArgumentParser,Store};
-use git2::Repository;
+use git2::{Repository,StatusOptions,Status};
 
 use worker::Worker;
 
@@ -61,8 +61,13 @@ fn main() {
         Ok(r) => r,
         Err(e) => panic!("failed to open {}: {}", &opts.repo, e)
     };
-    let (tree, parent) = get_repo_info(&mut repo);
+
+    if unstaged_changes(&mut repo) {
+        panic!("The repo at {} has unstaged changes.  Cowardly refusing to run.", opts.repo);
+    }
+
     let author         = get_author(&repo);
+    let (tree, parent) = get_repo_info(&mut repo);
 
     for i in 0..opts.threads {
         let thread_tx     = tx.clone();
@@ -135,4 +140,26 @@ fn get_author(repo: &Repository) -> String {
         .expect("Failed to read git config user.email");
 
     format!("{} <{}>", name, email)
+}
+
+fn unstaged_changes(repo: &mut Repository) -> bool {
+    let mut opts = StatusOptions::new();
+    let mut m = Status::empty();
+    let statuses = repo.statuses(Some(&mut opts)).unwrap();
+    let index = repo.index().unwrap();
+
+    m.insert(git2::STATUS_WT_NEW);
+    m.insert(git2::STATUS_WT_MODIFIED);
+    m.insert(git2::STATUS_WT_DELETED);
+    m.insert(git2::STATUS_WT_RENAMED);
+    m.insert(git2::STATUS_WT_TYPECHANGE);
+
+    for i in 0..statuses.len() {
+        let status_entry = statuses.get(i).unwrap();
+        if status_entry.status().intersects(m) {
+            return true;
+        }
+    }
+
+    false
 }
