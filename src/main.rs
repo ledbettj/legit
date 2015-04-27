@@ -1,7 +1,6 @@
 extern crate argparse;
 extern crate crypto;
 extern crate git2;
-extern crate rand;
 extern crate time;
 
 use std::fs::File;

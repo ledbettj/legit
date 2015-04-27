@@ -5,7 +5,6 @@ authors = ["John <john@throttle.io>"]
 
 [dependencies]
 rust-crypto = "*"
-rand        = "*"
 time        = "*"
 git2        = "*"
 argparse    = "*"
