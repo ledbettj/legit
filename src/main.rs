@@ -3,162 +3,56 @@ extern crate crypto;
 extern crate git2;
 extern crate time;
 
-use std::fs::File;
-use std::io::*;
-use std::path::Path;
-use std::process::Command;
-use std::sync::mpsc::channel;
-use std::thread;
-
 use argparse::{ArgumentParser,Store};
-use git2::{Repository,StatusOptions,Status};
 
-use worker::Worker;
+use gitminer::Gitminer;
 
 mod worker;
-
-struct Options {
-    threads: u32,
-    target:  String,
-    message: String,
-    repo:    String
-}
+mod gitminer;
 
 fn main() {
-    let mut opts = Options{
+    let mut opts = gitminer::Options{
         threads: 8,
         target:  "000000".to_string(),
         message: "default commit message".to_string(),
         repo:    ".".to_string()
     };
 
-    {
-        let mut ap = ArgumentParser::new();
-        ap.set_description("Generate git commit sha with a custom prefix");
+    parse_args_or_exit(&mut opts);
 
-        ap.refer(&mut opts.repo)
-            .add_argument("repository-path", Store, "Path to your git repository (required)")
-            .required();
-
-        ap.refer(&mut opts.target)
-            .add_option(&["-p", "--prefix"], Store, "Desired commit prefix (required)")
-            .required();
-
-        ap.refer(&mut opts.threads)
-            .add_option(&["-t", "--threads"], Store, "Number of worker threads to use (default 8)");
-
-        ap.refer(&mut opts.message)
-            .add_option(&["-m", "--message"], Store, "Commit message to use (required)")
-            .required();
-
-        ap.parse_args_or_exit();
-    }
-
-    let (tx, rx) = channel();
     let start = time::get_time();
-    let mut repo = match Repository::open(&opts.repo) {
-        Ok(r) => r,
-        Err(e) => panic!("failed to open {}: {}", &opts.repo, e)
+    let mut miner = match Gitminer::new(opts) {
+        Ok(m)  => m,
+        Err(e) => { panic!("Failed to start git miner: {}", e); }
     };
 
-    if unstaged_changes(&mut repo) {
-        panic!("The repo at {} has unstaged changes.  Cowardly refusing to run.", opts.repo);
-    }
-
-    let author         = get_author(&repo);
-    let (tree, parent) = get_repo_info(&mut repo);
-
-    for i in 0..opts.threads {
-        let thread_tx     = tx.clone();
-        let thread_target = opts.target.clone();
-        let (t, p, a, m) = (tree.clone(), parent.clone(), author.clone(), opts.message.clone());
-
-        thread::spawn(move || {
-            Worker::new(
-                i,
-                thread_target,
-                t, p, a, m,
-                thread_tx).work();
-        });
+    let hash = match miner.mine() {
+        Ok(s)  => s,
+        Err(e) => { panic!("Failed to generate commit: {}", e); }
     };
 
-    let (id, blob, hash) = rx.recv().unwrap();
     let duration = time::get_time() - start;
-
-    println!("success! worker {:02} generated commit {} in {}s",
-             id,
-             hash,
-             duration.num_seconds());
-
-    apply_commit(&opts.repo, &hash, &blob);
-
-    println!("All done! Enjoy your new commit.");
+    println!("Success! Generated commit {} in {} seconds", hash, duration.num_seconds());
 }
 
-fn apply_commit(git_root: &str, hash: &str, blob: &str) {
-    /* repo.blob() generates a blob, not a commit.
-     * don't know if there's a way to do this with libgit2. */
-    let tmpfile  = format!("/tmp/{}.tmp", hash);
-    let mut file = File::create(&Path::new(&tmpfile))
-        .ok()
-        .expect(&format!("Failed to create temporary file {}", &tmpfile));
+fn parse_args_or_exit(opts: &mut gitminer::Options) {
+    let mut ap = ArgumentParser::new();
+    ap.set_description("Generate git commit sha with a custom prefix");
 
-    file.write_all(blob.as_bytes())
-        .ok()
-        .expect(&format!("Failed to write temporary file {}", &tmpfile));
+    ap.refer(&mut opts.repo)
+        .add_argument("repository-path", Store, "Path to your git repository (required)")
+        .required();
 
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!("cd {} && git hash-object -t commit -w --stdin < {} && git reset --hard {}", git_root, tmpfile, hash))
-        .output()
-        .ok()
-        .expect("Failed to generate commit");
-}
+    ap.refer(&mut opts.target)
+        .add_option(&["-p", "--prefix"], Store, "Desired commit prefix (required)")
+        .required();
 
+    ap.refer(&mut opts.threads)
+        .add_option(&["-t", "--threads"], Store, "Number of worker threads to use (default 8)");
 
-fn get_repo_info(repo: &mut Repository) -> (String, String) {
-    let head = repo.revparse_single("HEAD").unwrap();
-    let mut index = repo.index().unwrap();
-    let tree = index.write_tree().unwrap();
+    ap.refer(&mut opts.message)
+        .add_option(&["-m", "--message"], Store, "Commit message to use (required)")
+        .required();
 
-    let head_s = format!("{}", head.id());
-    let tree_s = format!("{}", tree);
-
-    (tree_s, head_s)
-}
-
-fn get_author(repo: &Repository) -> String {
-    let cfg = match repo.config() {
-        Ok(c)  => c,
-        Err(e) => panic!("Couldn't open git config: {}", e)
-    };
-
-    let name  = cfg.get_string("user.name").ok()
-        .expect("Failed to read git config user.name");
-    let email = cfg.get_string("user.email").ok()
-        .expect("Failed to read git config user.email");
-
-    format!("{} <{}>", name, email)
-}
-
-fn unstaged_changes(repo: &mut Repository) -> bool {
-    let mut opts = StatusOptions::new();
-    let mut m = Status::empty();
-    let statuses = repo.statuses(Some(&mut opts)).unwrap();
-    let index = repo.index().unwrap();
-
-    m.insert(git2::STATUS_WT_NEW);
-    m.insert(git2::STATUS_WT_MODIFIED);
-    m.insert(git2::STATUS_WT_DELETED);
-    m.insert(git2::STATUS_WT_RENAMED);
-    m.insert(git2::STATUS_WT_TYPECHANGE);
-
-    for i in 0..statuses.len() {
-        let status_entry = statuses.get(i).unwrap();
-        if status_entry.status().intersects(m) {
-            return true;
-        }
-    }
-
-    false
+    ap.parse_args_or_exit();
 }
