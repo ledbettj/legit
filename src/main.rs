@@ -15,7 +15,8 @@ fn main() {
         threads: 8,
         target:  "000000".to_string(),
         message: "default commit message".to_string(),
-        repo:    ".".to_string()
+        repo:    ".".to_string(),
+        timestamp: time::now()
     };
 
     parse_args_or_exit(&mut opts);
@@ -53,6 +54,9 @@ fn parse_args_or_exit(opts: &mut gitminer::Options) {
     ap.refer(&mut opts.message)
         .add_option(&["-m", "--message"], Store, "Commit message to use (required)")
         .required();
+
+    //ap.refer(&mut opts.timestamp)
+    //    .add_option(&["--timestamp"], Store, "Commit timestamp to use (default now)");
 
     ap.parse_args_or_exit();
 }

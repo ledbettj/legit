@@ -11,33 +11,34 @@ pub struct Worker {
     tree:    String,
     parent:  String,
     author:  String,
-    message: String
+    message: String,
+    timestamp: time::Tm
 }
 
 impl Worker {
-    pub fn new(id:      u32,
-               target:  String,
-               tree:    String,
-               parent:  String,
-               author:  String,
-               message: String,
-               tx:      mpsc::Sender<(u32, String, String)>) -> Worker {
+    pub fn new(id:        u32,
+               target:    String,
+               tree:      String,
+               parent:    String,
+               author:    String,
+               message:   String,
+               timestamp: time::Tm,
+               tx:        mpsc::Sender<(u32, String, String)>) -> Worker {
         Worker {
-            id:      id,
-            digest:  sha1::Sha1::new(),
-            tx:      tx,
-            target:  target,
-            tree:    tree,
-            parent:  parent,
-            author:  author,
-            message: message
+            id:        id,
+            digest:    sha1::Sha1::new(),
+            tx:        tx,
+            target:    target,
+            tree:      tree,
+            parent:    parent,
+            author:    author,
+            message:   message,
+            timestamp: timestamp
         }
     }
 
     pub fn work(&mut self) {
-        let now  = time::now();
-        let nowz = now.strftime("%s %z").unwrap();
-        let tstamp = format!("{}", nowz);
+        let tstamp = format!("{}", self.timestamp.strftime("%s %z").unwrap());
 
         let mut value  = 0u32;
         loop {

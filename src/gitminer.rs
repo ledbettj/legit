@@ -11,10 +11,11 @@ use std::thread;
 use worker::Worker;
 
 pub struct Options {
-    pub threads: u32,
-    pub target:  String,
-    pub message: String,
-    pub repo:    String
+    pub threads:   u32,
+    pub target:    String,
+    pub message:   String,
+    pub repo:      String,
+    pub timestamp: time::Tm,
 }
 
 pub struct Gitminer {
@@ -54,14 +55,15 @@ impl Gitminer {
             let author = self.author.clone();
             let msg    = self.opts.message.clone();
             let wtx    = tx.clone();
+            let ts     = self.opts.timestamp.clone();
             let (wtree, wparent) = (tree.clone(), parent.clone());
 
             thread::spawn(move || {
-                Worker::new(i, target, wtree, wparent, author, msg, wtx).work();
+                Worker::new(i, target, wtree, wparent, author, msg, ts, wtx).work();
             });
         }
 
-        let (id, blob, hash) = rx.recv().unwrap();
+        let (_, blob, hash) = rx.recv().unwrap();
 
         match self.write_commit(&hash, &blob) {
             Ok(_)  => Ok(hash),
@@ -128,7 +130,6 @@ impl Gitminer {
         let mut opts = git2::StatusOptions::new();
         let mut m    = git2::Status::empty();
         let statuses = repo.statuses(Some(&mut opts)).unwrap();
-        let index    = repo.index().unwrap();
 
         m.insert(git2::STATUS_WT_NEW);
         m.insert(git2::STATUS_WT_MODIFIED);
