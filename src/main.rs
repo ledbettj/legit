@@ -1,8 +1,3 @@
-extern crate argparse;
-extern crate crypto;
-extern crate git2;
-extern crate time;
-
 use argparse::{ArgumentParser,Store};
 
 use gitminer::Gitminer;

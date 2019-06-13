@@ -1,6 +1,3 @@
-extern crate crypto;
-extern crate git2;
-extern crate time;
 use std::io::Write;
 use std::fs::File;
 use std::path::Path;
@@ -8,7 +5,7 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::thread;
 
-use worker::Worker;
+use super::worker::Worker;
 
 pub struct Options {
     pub threads:   u32,
@@ -33,7 +30,7 @@ impl Gitminer {
             Err(_) => { return Err("Failed to open repository"); }
         };
 
-        let author = try!(Gitminer::load_author(&repo));
+        let author = Gitminer::load_author(&repo)?;
 
         Ok(Gitminer {
             opts:   opts,
@@ -114,7 +111,7 @@ impl Gitminer {
     }
 
     fn prepare_tree(repo: &mut git2::Repository) -> Result<(String, String), &'static str> {
-        let _ = try!(Gitminer::ensure_no_unstaged_changes(repo));
+        Gitminer::ensure_no_unstaged_changes(repo)?;
 
         let head      = repo.revparse_single("HEAD").unwrap();
         let mut index = repo.index().unwrap();
@@ -131,11 +128,11 @@ impl Gitminer {
         let mut m    = git2::Status::empty();
         let statuses = repo.statuses(Some(&mut opts)).unwrap();
 
-        m.insert(git2::STATUS_WT_NEW);
-        m.insert(git2::STATUS_WT_MODIFIED);
-        m.insert(git2::STATUS_WT_DELETED);
-        m.insert(git2::STATUS_WT_RENAMED);
-        m.insert(git2::STATUS_WT_TYPECHANGE);
+        m.insert(git2::Status::WT_NEW);
+        m.insert(git2::Status::WT_MODIFIED);
+        m.insert(git2::Status::WT_DELETED);
+        m.insert(git2::Status::WT_RENAMED);
+        m.insert(git2::Status::WT_TYPECHANGE);
 
         for i in 0..statuses.len() {
             let status_entry = statuses.get(i).unwrap();
